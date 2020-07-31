@@ -1,0 +1,54 @@
+<?php
+
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_form_FORM_ID_alter() for entity_form_display_edit_form().
+ */
+function field_quick_required_form_entity_form_display_edit_form_alter(&$form, FormStateInterface $form_state, $form_id) {
+  $form['fields']['#header'][] = t('Required');
+  $fields = $form['#fields'];
+  foreach ($fields as $field_name) {
+    $config = \Drupal::service('entity_type.manager')->getStorage('field_config')->load($form['#entity_type'] . '.' . $form['#bundle'] . '.' . $field_name);
+    if ($config) {
+      $form['fields'][$field_name]['required'] = [
+        '#type' => 'checkbox',
+        '#default_value' => $config->isRequired(),
+      ];
+    }
+    else {
+      $form['fields'][$field_name]['required'] = [];
+    }
+  }
+  array_unshift($form['actions']['submit']['#submit'], 'field_quick_required_form_submit');
+}
+
+/**
+ * Validate callback.
+ * Feature: Make it possible to make fields required in the list.
+ */
+function field_quick_required_form_submit(array $form, FormStateInterface $form_state) {
+  $fields = $form['#fields'];
+  $values = $form_state->getValues();
+  foreach ($fields as $field_name) {
+    if (isset($values['fields'][$field_name]['required'])) {
+      $config = \Drupal::service('entity_type.manager')->getStorage('field_config')->load($form['#entity_type'] . '.' . $form['#bundle'] . '.' . $field_name);
+      $config->setRequired($values['fields'][$field_name]['required'])->save();
+    }
+  }
+}
+
+/**
+ * Implements hook_module_implements_alter().
+ *
+ * Ensures the call to field_quick_required_ui_form_field_ui_field_overview_form_alter()
+ * function runs after any invocation of the form_alter() by other modules, e.g.
+ * Field Group module.
+ */
+function field_quick_required_module_implements_alter(&$implementations, $hook) {
+  if ($hook == 'form_alter' && array_key_exists('field_quick_required', $implementations)) {
+    $group = $implementations['field_quick_required'];
+    unset($implementations['field_quick_required']);
+    $implementations['field_quick_required'] = $group;
+  }
+}
